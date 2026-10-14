@@ -1,9 +1,73 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <time.h>
-#include <windows.h>
-#include <conio.h>
+
+void err_exit(const char* const function_name) {
+	perror(function_name);
+	exit(EXIT_FAILURE);
+}
+
+#ifdef _WIN32
+	#include <windows.h>
+	#include <conio.h>
+#else
+	#include <errno.h>
+	#include <signal.h>
+	#include <termios.h>
+	#include <unistd.h>
+
+	// https://viewsourcecode.org/snaptoken/kilo/02.enteringRawMode.html
+
+	void tcsetattr_exit_on_err(
+		int fd,
+		int optional_actions,
+		const struct termios *termios_p
+	) {
+		if (tcsetattr(fd, optional_actions, termios_p) != 0) err_exit("tcsetattr");
+		// https://linux.die.net/man/3/tcgetattr:
+		// Note that tcsetattr() returns success if any of the requested changes
+		// could be successfully carried out. Therefore, when making multiple
+		// changes it may be necessary to follow this call with a further call to
+		// tcgetattr() to check that all changes have been performed successfully.
+		struct termios tmp;
+		if (tcgetattr(fd, &tmp) != 0) err_exit("tcgetattr (check after tcsetattr)");
+	}
+
+	struct termios orig_termios;
+	bool in_raw_mode = false;
+
+	// maybe use /dev/tty instead of STDIN_FILENO
+
+	// this is not really a raw mode, maybe rename
+	void enable_raw_mode() {
+		assert(!in_raw_mode);
+		if (tcgetattr(STDIN_FILENO, &orig_termios) != 0) err_exit("tcgetattr");
+		struct termios raw = orig_termios;
+		raw.c_lflag &= ~(ECHO | ICANON);
+		raw.c_cc[VMIN] = 0;
+		raw.c_cc[VTIME] = 0;
+		in_raw_mode = true;
+		// maybe use TCSADRAIN instead
+		tcsetattr_exit_on_err(STDIN_FILENO, TCSAFLUSH, &raw);
+	}
+	void disable_raw_mode_assume_raw() {
+		// maybe use TCSADRAIN instead
+		tcsetattr_exit_on_err(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+		in_raw_mode = false;
+	}
+	void disable_raw_mode() {
+		assert(in_raw_mode);
+		disable_raw_mode_assume_raw();
+	}
+
+	void interrupt_handler(const int signal_number) {
+		if (in_raw_mode) disable_raw_mode_assume_raw();
+		exit(signal_number);
+	}
+#endif
+
 
 const int N=10000;
 const int N_=1000;
@@ -97,12 +161,23 @@ float f1(float r) {
 	return 1;
 }
 
-void movepos( short x, short y ) { 
-    HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE) ; 
-    COORD position = { x, y } ; 
-     
-    SetConsoleCursorPosition( hStdout, position ) ; /**/
-}  
+void movepos(short x, short y) {
+#ifdef _WIN32
+	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+	COORD position = { x, y };
+	SetConsoleCursorPosition(hStdout, position);
+#else
+	printf("\x1B[%d;%dH", y + 1, x + 1);
+#endif
+}
+
+void clear_terminal_screen() {
+#ifdef _WIN32
+	system("cls");
+#else
+	printf("\x1B[3J\x1B[H");
+#endif
+}
 
 void ListStorage() {
 	printf("Tree:\n");
@@ -151,19 +226,6 @@ void Draw_new(int dx,int dy) {
 			}
 		}
 	}
-}
-
-void Draw(int dx,int dy) {
-	for (int y=0;y<screen_y;y+=dy) {
-		for (int x=0;x<screen_x;x+=dx) {
-			printf("%c",screen[x][y][0]);
-		}
-		printf(";");
-		for (int x=0;x<screen_x;x+=dx) {
-			printf("%c",screen[x][y][1]);
-		}
-		printf(";\n");
-	}printf("\n");
 }
 
 void draw_routes() {
@@ -1646,7 +1708,7 @@ void routes_greedy_fast(float penalty, float rad_x, float rad_y) {//generates th
 								r=sqrt(dx*dx+dy*dy);
 								
 								if ((Current[id]!=i)&&(penalty>=0)) {r+=penalty;}
-								
+
 								if ((Nodes_max>0)&&(nodes_has[i][j]+1>Nodes_max)) {
 									if (penalty>=0) {r+=penalty;}
 									if (penalty<0) {cando=false;}
@@ -1658,7 +1720,7 @@ void routes_greedy_fast(float penalty, float rad_x, float rad_y) {//generates th
 									if (penalty>=0) {r+=penalty;}
 									if (penalty<0) {cando=false;}
 								}
-								
+
 								if (((minr<0)||(r<minr))&&(cando==true)) {
 									minr=r;
 									lead_m=i;
@@ -1671,7 +1733,7 @@ void routes_greedy_fast(float penalty, float rad_x, float rad_y) {//generates th
 						}
 						
 					}
-					
+
 				} else {
 					run=0;//searching for the objects close enough for being checked
 					while ((QTree_cond[0]!=2)||(run>0)) {
@@ -1680,32 +1742,32 @@ void routes_greedy_fast(float penalty, float rad_x, float rad_y) {//generates th
 							//trying to connect it whole
 							
 							for (int k=0;k<Storage_max[QTree_Storage[run]];k++) {
-								
+
 								id=Storage[QTree_Storage[run]][k];
-								
+
 								if (isfreed[id]==true) {
-									
+
 									//try to connect id exactly
 									if ((Current[id]==i)||(penalty>=0)) {
 										cando=true;
 										dx=xx[i][j]-Ob_x[id];
 										dy=yy[i][j]-Ob_y[id];
 										r=sqrt(dx*dx+dy*dy);
-										
+
 										if ((Current[id]!=i)&&(penalty>=0)) {r+=penalty;}
-										
+
 										if ((Nodes_max>0)&&(nodes_has[i][j]+1>Nodes_max)) {
 											if (penalty>=0) {r+=penalty;}
 											if (penalty<0) {cando=false;}
 										}
-										
+
 										dx=Base_x[i]-Ob_x[id];//connect current choosen with the finish point, it is the worst case.
 										dy=Base_y[i]-Ob_y[id];
 										if ((Length_max>0)&&(length_has[i][j]+r+sqrt(dx*dx+dy*dy)>Length_max)) {
 											if (penalty>=0) {r+=penalty;}
 											if (penalty<0) {cando=false;}
 										}
-										
+
 										if (((minr<0)||(r<minr))&&(cando==true)) {
 											minr=r;
 											lead_m=i;
@@ -1714,13 +1776,13 @@ void routes_greedy_fast(float penalty, float rad_x, float rad_y) {//generates th
 											lead_link=run;
 										}
 									}
-									
+
 								}
-								
+
 							}
 							
 							run=QTree_back[run];
-							
+
 						} else {
 							if (QTree_cond[run]==0) {//<
 								
@@ -1745,10 +1807,10 @@ void routes_greedy_fast(float penalty, float rad_x, float rad_y) {//generates th
 										}
 									}
 								}
-								
+
 							} else {
 								if (QTree_cond[run]==1) {//>=
-									
+
 									if (QTree_elements[QTree_big[run]]==0) {//do not have anything on there yet
 										QTree_cond[run]=2;
 									} else {
@@ -1770,14 +1832,14 @@ void routes_greedy_fast(float penalty, float rad_x, float rad_y) {//generates th
 											}
 										}
 									}
-									
+
 								} else {//done
 									run=QTree_back[run];
 								}
 							}
 						}
 					}
-					
+
 				}
 			}
 		}
@@ -2759,7 +2821,7 @@ int main() {
 	scanf("%d %d %f %f",&Nodes_min,&Nodes_max,&Length_min,&Length_max);
 	
 	time_final=time(0)+60*100;//setting a timer, set it to around 5 seconds before the timeout
-	
+
 	LN=2*(int)(log(n)/log(2)+5);
 	
 	sample_generate(n,m,lx,ly,5);//generating a sample
@@ -2776,7 +2838,7 @@ int main() {
 	Steiner_save(0);//saving all the Steiner stuff we have made as a good solution
 	Steiner_save(1);
 	
-	system("cls");
+	clear_terminal_screen();
 	
 	int counting_bad,counting_bad_min=-1,iter=0;
 	float SAT_min=-1;
@@ -2787,16 +2849,55 @@ int main() {
 	
 	double global_best_found=-1;
 	
-	system("cls");
+	clear_terminal_screen();
 	ScreenClear();
 	
 	dodraw=true;
 	
 	Steiner_save(2);
 	routes_save(2);
-	
+
+#ifndef _WIN32
+	struct sigaction sigint_action;
+	sigint_action.sa_handler = &interrupt_handler;
+	sigint_action.sa_flags = 0;
+	if (sigfillset(&sigint_action.sa_mask) != 0)	  err_exit("sigfillset");
+	if (sigaction(SIGINT, &sigint_action, NULL) != 0) err_exit("sigaction");
+
+	enable_raw_mode();
+	atexit(disable_raw_mode);
+#endif
+
 	while ((ch!=' ')&&(is_time_still()==true)) {
-		
+
+#ifndef _WIN32
+		while (true) {
+			char ch_buf[8];
+			ssize_t n = read(STDIN_FILENO, ch_buf, sizeof ch_buf);
+			if (n == 0) break;
+			if (n == -1) {
+				if (errno == EINTR) continue;
+				else				err_exit("read");
+			}
+			for (ssize_t i = 0; i < n; ++i) {
+				dodraw=true;
+				ch = ch_buf[i];
+				if (ch=='w') {movy-=5*size;}
+				if (ch=='d') {movx+=5*size;}
+				if (ch=='s') {movy+=5*size;}
+				if (ch=='a') {movx-=5*size;}
+				if (ch=='2') {size+=1;}
+				if ((ch=='1')&&(size>=2)) {size-=1;}
+				if (ch=='3') {
+					draw_routes();
+					dodraw=false;
+				}
+			}
+			// The loop restarts for consistency with the windows version.
+			// I would probably avoid doing so many read calls (at least 2 per
+			// loop iteration) and just process 8 symbols per loop iteration.
+		}
+#else
 		while (kbhit()) {
 			dodraw=true;
 			ch=getch();
@@ -2810,26 +2911,14 @@ int main() {
 				draw_routes();
 				dodraw=false;
 			}
-		}/**/
-		/*dodraw=true;
-		scanf("%c\n",&ch);
-		if (ch=='w') {movy-=5*size;}
-		if (ch=='d') {movx+=5*size;}
-		if (ch=='s') {movy+=5*size;}
-		if (ch=='a') {movx-=5*size;}
-		if (ch=='2') {size+=1;}
-		if ((ch=='1')&&(size>=2)) {size-=1;}
-		if (ch=='3') {
-			draw_routes();
-			dodraw=false;
 		}
-		/**/
-		
+#endif
+
 		if (ch=='r') {
 			Steiner_load(2);
 			routes_load(2);
 			
-			system("cls");
+			clear_terminal_screen();
 			printf("Stop - any, Autorestart - a, Noautorestart - n\n");
 			printf("starting calculations:\n");
 			penalty=0;
@@ -2839,12 +2928,17 @@ int main() {
 			ch=0;
 			float po=1;
 			while (((ch=='n')||(ch=='a')||(ch==0))&&(is_time_still()==true)) {
+#ifndef _WIN32
+				if (read(STDIN_FILENO, &ch, 1) == -1) {
+					if (errno == EINTR) continue;
+					else				err_exit("read");
+				}
+#else
 				if (kbhit()) {
 					ch=getch();
-				}/**/
-				/*scanf("%c\n",&ch);
-				/**/
-				
+				}
+#endif
+
 				variate_coefficients();
 				
 				penalty=tick*tick+po;
@@ -2949,7 +3043,7 @@ int main() {
 			
 			ch=0;
 			
-			system("cls");
+			clear_terminal_screen();
 			ScreenClear();
 		}
 		
@@ -2957,16 +3051,15 @@ int main() {
 			ScreenPrepare(size,size,movx,movy,true,0);
 			ScreenPrepare(size,size,movx,movy,false,1);
 			ScreenPrepareRoutes(size,size,movx,movy,1);
-			movepos(0,0);/**/
+			movepos(0,0);
 			printf("wdsa - move, 12 - zoom, r - start calculations\n");
-			Draw_new(1,1);/**/
-			/*Draw(1,1);/**/
+			Draw_new(1,1);
 			dodraw=false;
 		}
 	}
-	
-	system("cls");
+
+	clear_terminal_screen();
 	printf("Done in %d lag\n",time(0)-time_final);
-	
+
 	return 0;
 }
