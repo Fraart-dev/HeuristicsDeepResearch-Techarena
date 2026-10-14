@@ -63,7 +63,6 @@ void err_exit(const char* const function_name) {
 	}
 
 	void interrupt_handler(const int signal_number) {
-		if (in_raw_mode) disable_raw_mode_assume_raw();
 		exit(signal_number);
 	}
 #endif
