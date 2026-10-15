@@ -70,6 +70,7 @@ void err_exit(const char* const function_name) {
 
 const int N=10000;
 const int N_=1000;
+const int Tmax=7;
 int LN=2*(int)(log(N)/log(2)+5);
 const int M=50;
 const int M_=M*4;
@@ -84,8 +85,9 @@ int Nodes_min=10;
 int Nodes_max=200;
 
 float Ob_x[N],Ob_y[N];
+bool Ob_days[N][Tmax];
 float Base_x[M],Base_y[M];
-int Base_M[M][M];
+int Base_day[M][M__];
 int Ob_Base[N];
 int Base_Ob[M];
 int Ob_Neighbors[N][N_],Ob_Neighbors_max[N];
@@ -94,8 +96,9 @@ int Ob_back[N],Ob_forward[N];//to store a path
 int Base_start[M][M__],Base_finish[M][M__],Base_max[M];//to store path begin and end
 float Base_length[M][M__];
 int Base_nodes[M][M__];
+int Base_nodes_days[M][M__];
 int Ob_back_save[N][3],Ob_forward_save[N][3];//to store a path - saved
-int Base_start_save[M][M__][3],Base_finish_save[M][M__][3],Base_max_save[M][3];//to store path begin and end - saved
+int Base_start_save[M][M__][3],Base_finish_save[M][M__][3],Base_max_save[M][3],Base_day_save[M][M__][3];//to store path begin and end - saved
 int m=0,n=0;
 
 bool base_stays_on_cluster=true;
@@ -233,16 +236,18 @@ void draw_routes() {
 		for (int j=0;j<Base_max[i];j++) {
 			int g;
 			
-			printf("    Route %d ->:",j);
+			printf("    Route %d (day %d) ->:",j,Base_day[i][j]);
 			g=Base_start[i][j];
 			while ((g!=Base_finish[i][j])&&(g!=-1)) {
 				//printf("-[%d %d]-",g,Current[g]);
 				printf("[%d]",g);
+				//for (int ii=0;ii<Tmax;ii++) printf("%c",'A'+Ob_days[g][ii]);
 				g=Ob_forward[g];
 			}
 			if (g!=-1) {
 				//printf("-[%d %d]-",g,Current[g]);
 				printf("[%d]",g);
+				//for (int ii=0;ii<Tmax;ii++) printf("%c",'A'+Ob_days[g][ii]);
 				if (g==Base_finish[i][j]) {printf(";");}
 			} else {
 				printf("|");
@@ -275,6 +280,7 @@ void routes_save(int mode) {
 		for (int j=0;j<Base_max[i];j++) {
 			Base_start_save[i][j][mode]=Base_start[i][j];
 			Base_finish_save[i][j][mode]=Base_finish[i][j];
+			Base_day_save[i][j][mode]=Base_day[i][j];
 		}
 	}
 }
@@ -289,6 +295,7 @@ void routes_load(int mode) {
 		for (int j=0;j<Base_max_save[i][mode];j++) {
 			Base_start[i][j]=Base_start_save[i][j][mode];
 			Base_finish[i][j]=Base_finish_save[i][j][mode];
+			Base_day[i][j]=Base_day_save[i][j][mode];
 		}
 	}
 }
@@ -907,6 +914,12 @@ float median_storage(int s,char variable) {
 	}
 	
 	return tt;
+}
+
+void QTree_destroy() {//to avoid memory leak
+	for (int i=0;i<Storage_max_max;i++) {
+		delete(Storage[i]);
+	}
 }
 
 void Qtree_generate() {
@@ -1540,6 +1553,7 @@ void routes_greedy(float penalty) {//generates the greedy routes
 			yy[i][j]=Base_y[i];
 			Base_start[i][j]=-1;
 			Base_finish[i][j]=-1;
+			Base_day[i][j]=rand()%(Tmax-1)+1;
 			last[i][j]=-1;
 			nodes_has[i][j]=0;
 			length_has[i][j]=0;
@@ -1562,6 +1576,11 @@ void routes_greedy(float penalty) {//generates the greedy routes
 						
 						if ((Current[Ob_freed[k]]!=i)&&(penalty>=0)) {r+=penalty;}
 						
+						if ((Ob_days[Ob_freed[k]][0]==false)&&(Ob_days[Ob_freed[k]][Base_day[i][j]]==false)) {
+							if (penalty>=0) {r+=penalty;}//day 0 means it can be served at any time
+							if (penalty<0) {cando=false;}
+						}
+
 						if ((Nodes_max>0)&&(nodes_has[i][j]+1>Nodes_max)) {
 							if (penalty>=0) {r+=penalty;}
 							if (penalty<0) {cando=false;}
@@ -1674,6 +1693,7 @@ void routes_greedy_fast(float penalty, float rad_x, float rad_y) {//generates th
 			yy[i][j]=Base_y[i];
 			Base_start[i][j]=-1;
 			Base_finish[i][j]=-1;
+			Base_day[i][j]=rand()%(Tmax-1)+1;
 			last[i][j]=-1;
 			nodes_has[i][j]=0;
 			length_has[i][j]=0;
@@ -1707,6 +1727,11 @@ void routes_greedy_fast(float penalty, float rad_x, float rad_y) {//generates th
 								r=sqrt(dx*dx+dy*dy);
 								
 								if ((Current[id]!=i)&&(penalty>=0)) {r+=penalty;}
+
+								if ((Ob_days[id][0]==false)&&(Ob_days[id][Base_day[i][j]]==false)) {
+									if (penalty>=0) {r+=penalty;}//day 0 means it can be served at any time
+									if (penalty<0) {cando=false;}
+								}
 
 								if ((Nodes_max>0)&&(nodes_has[i][j]+1>Nodes_max)) {
 									if (penalty>=0) {r+=penalty;}
@@ -2066,6 +2091,11 @@ void routes_repair(float penalty,float T) {//T is being variated from 0 up to in
 							r=dx*dx+dy*dy;
 							if (Current[Ob_freed[k]]!=i) {r+=penalty;}
 							
+							if ((Ob_days[Ob_freed[k]][0]==false)&&(Ob_days[Ob_freed[k]][Base_day[i][j]]==false)) {
+								if (penalty>=0) {r+=penalty;}//day 0 means it can be served at any time
+								if (penalty<0) {canadd=false;}
+							}
+
 							dx=xx_back[i][j]-Ob_x[Ob_freed[k]];//trying connect currently added with last from back chain, the worst case will be like this
 							dy=yy_back[i][j]-Ob_y[Ob_freed[k]];
 							if ((r+forward_length[i][j]+back_length[i][j]+sqrt(dx*dx+dy*dy)>Length_max)) {
@@ -2102,6 +2132,11 @@ void routes_repair(float penalty,float T) {//T is being variated from 0 up to in
 							r=dx*dx+dy*dy;
 							if (Current[Ob_freed[k]]!=i) {r+=penalty;}
 							
+							if ((Ob_days[Ob_freed[k]][0]==false)&&(Ob_days[Ob_freed[k]][Base_day[i][j]]==false)) {
+								if (penalty>=0) {r+=penalty;}//day 0 means it can be served at any time
+								if (penalty<0) {canadd=false;}
+							}
+
 							dx=xx_forward[i][j]-Ob_x[Ob_freed[k]];//trying connect currently added with last from forward chain, the worst case will be like this
 							dy=yy_forward[i][j]-Ob_y[Ob_freed[k]];
 							if ((r+forward_length[i][j]+back_length[i][j]+sqrt(dx*dx+dy*dy)>Length_max)) {
@@ -2205,6 +2240,61 @@ void routes_repair(float penalty,float T) {//T is being variated from 0 up to in
 					}	
 				}
 			}
+		}
+	}
+}
+
+void days_repair() {
+	int g,T;
+
+	float days[Tmax];
+
+	for (int i=0;i<m-4;i++) {
+		for (int j=0;j<Base_max[i];j++) {
+
+			for (int k=0;k<Tmax;k++) {days[k]=0;}
+			T=0;
+
+			g=Base_start[i][j];
+			if (g!=-1) {
+
+				while ((g!=Base_finish[i][j])&&(g!=-1)) {
+					if (Ob_days[g][0]==false) {//detect day
+						for (int k=1;k<Tmax;k++) {
+							if (Ob_days[g][k]==true) {
+								days[k]++;
+								T++;
+							}
+						}
+					}
+
+					g=Ob_forward[g];
+				}
+
+				if (g!=-1) {
+					if (Ob_days[g][0]==false) {//detect day
+						for (int k=1;k<Tmax;k++) {
+							if (Ob_days[g][k]==true) {
+								days[k]++;
+								T++;
+							}
+						}
+					}
+				}
+
+			}
+
+			if (T>0) {
+				float ra=rand_huge()%10000/10000.0,ra_;
+				for (int k=0;k<Tmax;k++) {
+					ra_=ra;
+					ra-=(float)(days[k])/(float)(T);
+					if ((ra<=0)&&(ra_>=0)) {
+						Base_day[i][j]=k;
+					}
+				}
+			}
+
 		}
 	}
 }
@@ -2374,16 +2464,20 @@ double evaluate_routes(float penalty) {
 			ans_=0;
 			ans_pen=0;
 			
+			Base_nodes_days[i][j]=0;
+
 			g=Base_start[i][j];
 			if (g==-1) {
 				Base_nodes[i][j]=0;
 				Base_length[i][j]=0;
+				Base_nodes_days[i][j]=0;
 			} else {
 				dx=Base_x[i]-Ob_x[Base_start[i][j]];
 				dy=Base_y[i]-Ob_y[Base_start[i][j]];
 				ans_+=sqrt(dx*dx+dy*dy);
 				
 				if ((Current[Base_start[i][j]]!=i)&&(penalty>=0)) {ans_pen+=penalty;}
+				if ((Ob_days[Base_start[i][j]][0]==false)&&(Ob_days[Base_start[i][j]][Base_day[i][j]]==false)) {Base_nodes_days[i][j]++;}
 				
 				Base_nodes[i][j]=1;
 				
@@ -2395,6 +2489,7 @@ double evaluate_routes(float penalty) {
 						dy=Ob_y[g]-Ob_y[g_];
 						ans_+=sqrt(dx*dx+dy*dy);
 						if ((Current[g]!=i)&&(penalty>=0)) {ans_pen+=penalty;}
+						if ((Ob_days[g][0]==false)&&(Ob_days[g][Base_day[i][j]]==false)) {Base_nodes_days[i][j]++;}
 					}
 					Base_nodes[i][j]++;
 				}
@@ -2477,6 +2572,17 @@ int evaluate_unfeasibility_Lengths() {//requires running evaluate_routes() befor
 	return ans;
 }
 
+int evaluate_unfeasibility_Days() {//requires running evaluate_routes() before
+	int ans=0;
+	for (int i=0;i<m-4;i++) {
+		for (int j=0;j<Base_max[i];j++) {
+			ans+=Base_nodes_days[i][j];
+		}
+	}
+	return ans;
+}
+
+
 void routes_variate(int iter_huge,int iter,float penalty,float cooling,float maxcool,float alpha) {//block R
 	double goal,goal_best;
 	float Temp;
@@ -2494,6 +2600,8 @@ void routes_variate(int iter_huge,int iter,float penalty,float cooling,float max
 	float a,b;
 	int a_num,b_num;
 	
+	float penalty_;
+
 	int num;
 	
 	//routes_greedy(penalty);
@@ -2504,6 +2612,13 @@ void routes_variate(int iter_huge,int iter,float penalty,float cooling,float max
 	char per_prev=0;
 	
 	for (int iitt=0;(iitt<iter_huge)&&(is_time_still()==true);iitt++) {
+
+		if (iitt<iter_huge/2) {
+			penalty_=penalty*iitt/(iter_huge/2);
+		} else {
+			penalty_=penalty;
+		}
+
 		if (iitt*10/iter_huge>per_prev) {
 			per_prev++;
 			printf("[=]");
@@ -2512,8 +2627,8 @@ void routes_variate(int iter_huge,int iter,float penalty,float cooling,float max
 		num=0;
 		Temp=0;
 		
-		//routes_greedy(penalty);
-		routes_greedy_fast(penalty,global_rad_x,global_rad_y);
+		//routes_greedy(penalty_);
+		routes_greedy_fast(penalty_,global_rad_x,global_rad_y);
 		
 		for (int i=0;i<m-4;i++) {
 			num+=Base_max[i];
@@ -2548,8 +2663,9 @@ void routes_variate(int iter_huge,int iter,float penalty,float cooling,float max
 					}
 				}
 			}
-			routes_repair(penalty,sqrt(Temp/cooling)*cooling);
-			goal=evaluate_routes(penalty);
+			days_repair();
+			routes_repair(penalty_,sqrt(Temp/cooling)*cooling);
+			goal=evaluate_routes(penalty_);
 			if ((goal>=0)&&(goal<goal_best)) {
 				goal_best=goal;
 				routes_save(0);
@@ -2573,6 +2689,9 @@ void routes_variate(int iter_huge,int iter,float penalty,float cooling,float max
 					}
 					if (Base_nodes[i][j]<Nodes_min) {
 						distribution_type[i][j]=4;
+					}
+					if (Base_nodes_days[i][j]>0) {
+						distribution_type[i][j]=5;
 					}
 					if (distribution_type[i][j]==0) {
 						a+=distribution[i][j];
@@ -2598,7 +2717,7 @@ void routes_variate(int iter_huge,int iter,float penalty,float cooling,float max
 			}
 			routes_load(0);
 			Ob_freed_max=0;
-			evaluate_routes(penalty);
+			evaluate_routes(penalty_);
 		}
 		
 		for (int i=0;i<m-4;i++) {
@@ -2708,7 +2827,7 @@ void routes_color() {//show G R's oppinion
 	}
 }
 
-void sample_generate(int nn,int mm,int wx,int wy,int stepaway) {
+void sample_generate(int nn,int mm,int wx,int wy,int stepaway,float prob_alldays,float prob_days) {
 	n=nn;
 	m=mm;
 	float xmin=0,xmax=0,ymin=0,ymax=0;
@@ -2739,6 +2858,16 @@ void sample_generate(int nn,int mm,int wx,int wy,int stepaway) {
 	for (int i=0;i<n;i++) {
 		Ob_x[i]=wx*(rand_huge()%(100000))/100000.0-wx/2.0;
 		Ob_y[i]=wy*(rand_huge()%(100000))/100000.0-wy/2.0;
+
+		for (int j=0;j<Tmax;j++) {
+			Ob_days[i][j]=false;
+		}
+		for (int j=0;j<Tmax;j++) {
+			if (rand_huge()%100000/100000.0<prob_days) {Ob_days[i][j]=true;}
+		}
+		if (rand_huge()%100000/100000.0<prob_alldays) {
+			Ob_days[i][0]=true;//can be visited at any day
+		}
 	}
 }
 
@@ -2819,11 +2948,16 @@ int main() {
 	printf("Nodes(min,max),length(min,max). -1 ~ no constraint:");
 	scanf("%d %d %f %f",&Nodes_min,&Nodes_max,&Length_min,&Length_max);
 	
+	float p1,p2;
+
+	printf("P[always avaiable],P[avaiable at currect day]:");
+	scanf("%f %f",&p1,&p2);
+
 	time_final=time(0)+60*100;//setting a timer, set it to around 5 seconds before the timeout
 
 	LN=2*(int)(log(n)/log(2)+5);
 	
-	sample_generate(n,m,lx,ly,5);//generating a sample
+	sample_generate(n,m,lx,ly,5,p1,p2);//generating a sample
 	
 	Qtree_generate();//building a Qtree for further optimizatin
 	
@@ -2840,6 +2974,7 @@ int main() {
 	clear_terminal_screen();
 	
 	int counting_bad,counting_bad_min=-1,iter=0;
+	int uf_best=-1,uf1_best=-1,uf2_best=-1,uf3_best=-1,uf4_best=-1;
 	float SAT_min=-1;
 	ch=0;
 	
@@ -2888,6 +3023,7 @@ int main() {
 				if (ch=='2') {size+=1;}
 				if ((ch=='1')&&(size>=2)) {size-=1;}
 				if (ch=='3') {
+					movepos(0,60);
 					draw_routes();
 					dodraw=false;
 				}
@@ -2907,6 +3043,7 @@ int main() {
 			if (ch=='2') {size+=1;}
 			if ((ch=='1')&&(size>=2)) {size-=1;}
 			if (ch=='3') {
+				movepos(0,60);
 				draw_routes();
 				dodraw=false;
 			}
@@ -2918,15 +3055,15 @@ int main() {
 			routes_load(2);
 			
 			clear_terminal_screen();
-			printf("Stop - any, Autorestart - a, Noautorestart - n\n");
+			printf("Stop - any,Continue - r\n");
 			printf("starting calculations:\n");
 			penalty=0;
-			float len;
-			int tick=0,uf,uf1,uf2;
-			int uf_=0,uf1_=0,uf2_=0;
-			ch=0;
+			float len,len_min=-1;
+			int tick=0,uf,uf1,uf2,uf3;
+			int uf_=0,uf1_=0,uf2_=0,uf3_=0;
+			ch='r';
 			float po=1;
-			while (((ch=='n')||(ch=='a')||(ch==0))&&(is_time_still()==true)) {
+			while (((ch=='r')||(ch==0))&&(is_time_still()==true)) {
 #ifndef _WIN32
 				if (read(STDIN_FILENO, &ch, 1) == -1) {
 					if (errno == EINTR) continue;
@@ -2942,7 +3079,7 @@ int main() {
 				
 				penalty=tick*tick+po;
 				tick+=1;
-				po*=1.2;
+				po*=1.5;
 				
 				printf("running G block:");
 				geometry_variate(10,10,10,50);//O(mn)
@@ -2960,12 +3097,17 @@ int main() {
 				uf=evaluate_unfeasibility();
 				uf1=evaluate_unfeasibility_Nodes();
 				uf2=evaluate_unfeasibility_Lengths();
-				printf("price:%f penalty_border:%f unfeasibility:%d %d %d\n",len,penalty,uf,uf1,uf2);
+				uf3=evaluate_unfeasibility_Days();
+				printf("price:%f penalty_border:%f unfeasibility:%d %d %d %d\n",len,penalty,uf,uf1,uf2,uf3);
 				
 				if (
-					((uf>=0)&&(uf<uf_))||
-					((uf1>=0)&&(uf1<uf1_))||
-					((uf2>=0)&&(uf2<uf2_))
+					(uf>=0)&&
+					(
+						(uf<uf_)||
+						(uf1<uf1_)||
+						(uf2<uf2_)||
+						(uf3<uf3_)
+					)
 				) {
 					coeffs_feedback(0.1);
 				} else {
@@ -2975,15 +3117,44 @@ int main() {
 				uf_=uf;
 				uf1_=uf1;
 				uf2_=uf2;
+				uf3_=uf3;
+
+				if ((len_min<0)&&(len>0)) {
+					len_min=len;//lower bound
+				}
 				
-				if (((uf<0)||((uf<=0)&&(uf1<=0)&&(uf2<=0)))&&(ch=='a')) {
+				if (
+					((uf<0)||((uf<=0)&&(uf1<=0)&&(uf2<=0)&&(uf3<=0)))||
+					((len>len_min*4)&&(len_min>=0))
+				) {
+					if ((len>len_min*4)&&(len_min>=0)) {
+						Steiner_load(2);
+						routes_load(2);
+					}
 					tick=2;
 					po=1;
 					printf("-->Autorestart\n");
-					coeffs_feedback(10);
+					coeffs_feedback(1);
 				}
 				
-				if ((len>=0)&&(uf==0)&&(uf1==0)&&(uf2==0)&&( (global_best_found<0) || (len<global_best_found) )) {
+				if (global_best_found<0) {//have not found yet
+					if (
+						((uf_best<0)||(uf<uf_best))&&
+						((uf1_best<0)||(uf1<uf1_best))&&
+						((uf2_best<0)||(uf2<uf2_best))&&
+						((uf3_best<0)||(uf3<uf3_best))
+					) {
+						uf_best=uf;
+						uf1_best=uf1;
+						uf2_best=uf2;
+						uf3_best=uf3;
+						printf("Have not found feasible still, that is why saving unfeasible\n");
+						Steiner_save(2);
+						routes_save(2);
+					}
+				}
+
+				if ((len>=0)&&(uf==0)&&(uf1==0)&&(uf2==0)&&(uf3==0)&&( (global_best_found<0) || (len<global_best_found) )) {
 					printf("------>New solution with %f price has been found!!! | without upgradeing at all<-------\n",len);
 					printf("local searching:");
 					
@@ -3004,7 +3175,7 @@ int main() {
 					routes_local_search_2swap(200);
 					float tem=evaluate_routes(-1);
 					if ((tem>=0)&&((global_best_found<0)||(tem<global_best_found))) {
-						if ((evaluate_unfeasibility()==0)&&(evaluate_unfeasibility_Nodes()==0)&&(evaluate_unfeasibility_Lengths()==0)) {
+						if ((evaluate_unfeasibility()==0)&&(evaluate_unfeasibility_Nodes()==0)&&(evaluate_unfeasibility_Lengths()==0)&&(evaluate_unfeasibility_Days()==0)) {
 							printf("------>New solution with %f price has been found!!! | small upgrades were made<-------\n",tem);
 							global_best_found=tem;
 							Steiner_save(2);
@@ -3016,24 +3187,13 @@ int main() {
 							routes_variate(10,10,-1, coeffs[0],2, coeffs[4]);
 							printf("\n");
 							routes_local_search_2swap(200);
-							
-							tem=evaluate_routes(-2);//try the long way now
-							if ((tem>=0)&&((global_best_found<0)||(tem<global_best_found))) {
-								if (evaluate_unfeasibility()==0) {
-									printf("------>New UPGRADED solution with %f price has been found!!!<-------\n",tem);
-									global_best_found=tem;
-									Steiner_save(2);
-									routes_save(2);
-								}
-							}
-							
 						} else {
-							printf("The solution was infeasible, that is why won't be observed\n");
+							printf("[%d %d %d %d]\n",evaluate_unfeasibility(),evaluate_unfeasibility_Nodes(),evaluate_unfeasibility_Lengths(),evaluate_unfeasibility_Days());
+							printf("The solution was unfeasible, that is why won't be observed\n");
 						}
 					}
 				}
 			}
-			
 			Steiner_load(2);
 			routes_load(2);
 			
@@ -3059,6 +3219,8 @@ int main() {
 
 	clear_terminal_screen();
 	printf("Done in %d lag\n",time(0)-time_final);
+
+	QTree_destroy();
 
 	return 0;
 }
