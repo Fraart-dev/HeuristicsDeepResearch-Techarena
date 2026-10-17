@@ -104,6 +104,8 @@ float coeffs_density[10][qu_coeffs];//quanting
 
 int time_final;
 
+float alpha_global=1;
+
 bool is_time_still() {
 	if (time(0)>time_final) {return false;}
 	return true;
@@ -2120,6 +2122,17 @@ double evaluate_routes(float penalty) {
 		}
 		
 	}
+	
+	int nod_min=-1,nod_max=-1;
+	for (int i=0;i<m-4;i++) {
+		co=Base_nodes[i];
+		if (co>0) {
+			if ((nod_min==-1)||(co<nod_min)) {nod_min=co;}
+			if ((nod_max==-1)||(co>nod_max)) {nod_max=co;}
+		}
+	}
+	ans+=alpha_global*(nod_max-nod_min);
+	
 	return ans+initial_summ;
 }
 
