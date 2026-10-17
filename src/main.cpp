@@ -281,15 +281,16 @@ void Steiner_load(int mode) {
 
 void Steiner_generate() {
 	ms=0;
-	float Base_x_[M],Base_y_[M];
-	float dx[M],dy[M],mx[M],my[M],ddx,ddy,ddr,ddx_,ddy_,ddr_,angle[M];
-	int imin,j_,a,b,vlink[M_],A,B;
-	float vx[M_],vy[M_],vmax,t;
-	bool valid[M],isit;
+	double Base_x_[M*2],Base_y_[M*2];
+	double dx[M*2],dy[M],mx[M*2],my[M*2],ddx,ddy,ddr,ddx_,ddy_,ddr_,angle[M*2];
+	int imin,j,j_,a,b,vlink[M*2],A,B;
+	double vmax,t;
+	double vx[M*2],vy[M*2];
+	bool valid[M*2],isit;
 	
 	for (int i=0;i<m;i++) {//doing for i
-		Base_x_[i]=Base_x[i]+rand_huge()%100000/100000.0-0.5;
-		Base_y_[i]=Base_y[i]+rand_huge()%100000/100000.0-0.5;
+		Base_x_[i]=Base_x[i]+(rand_huge()%100000/100000.0-0.5);
+		Base_y_[i]=Base_y[i]+(rand_huge()%100000/100000.0-0.5);
 	}
 	
 	for (int i=0;i<m-4;i++) {//doing for i
@@ -304,8 +305,9 @@ void Steiner_generate() {
 				my[j]=(Base_y_[i]+Base_y_[j])/2.0;
 				
 				//[mx+tdy-xi]2+[my-tdx-yi]2
-				//tt[dxdx+dydy]-2t[ dy[mx-xi]-dx[my-yi] ]+[mx-xi]2+[my-yi]2
-				t=( dy[j]*(mx[j]-Base_x_[i])-dx[j]*(my[j]-Base_y_[i]) ) / ( dx[j]*dx[j]+dy[j]*dy[j] );
+				//tt[dxdx+dydy]+2t[ dy[mx-xi]-dx[my-yi] ]+[mx-xi]2+[my-yi]2
+				//t[dxdx+dydy]=-[ dy[mx-xi]-dx[my-yi] ]
+				t=-( dy[j]*(mx[j]-Base_x_[i])-dx[j]*(my[j]-Base_y_[i]) ) / ( dx[j]*dx[j]+dy[j]*dy[j] );
 				
 				mx[j]+=t*dy[j];
 				my[j]-=t*dx[j];
@@ -337,7 +339,9 @@ void Steiner_generate() {
 			}
 		}
 		
-		for (int j=0;j<m;j++) {
+		
+		for (int j=0;j<m-1;j++) {
+			valid[j]=1;
 			j_=j-1;
 			if (j_<0) {j_+=m;}
 			if (angle[j]==angle[j-1]) {//two lines are collinear, disable furthest
@@ -349,137 +353,73 @@ void Steiner_generate() {
 			}
 		}
 		
-		/*for (int j=0;j<m-1;j++) {
-			DBG("[%.2f %.2f %.2f %.2f]\n",dx[j],dy[j],mx[j],my[j]);
-		}DBG("{%.2f %.2f}\n\n",Base_x[i],Base_y[i]);/**/
-		
-		vmax=0;
-		a=0;
-		b=0;
-		j_=0;
-		for (int j=0;j<m-1;j++) {
+		isit=true;
+		while (isit==true) {
 			
-			if (valid[j]==1) {
-				/*x*dx[j]+y*dy[j]=dx[j]*mx[j]+dy[j]*my[j]
-				x*dx[j_]+y*dy[j_]=dx[j_]*mx[j_]+dy[j_]*my[j_]
+			a=0;
+			
+			j=0;
+			
+			while (valid[j]==0) {
+				j++;
+				if (j>=m-1) {j-=m-1;}
+			}
+			
+			b=j;
+			j_=-1;
+			
+			while (j_!=b) {
 				
-				x*dx[j]*dx[j_]+y*dy[j]*dx[j_]=dx[j]*dx[j_]*mx[j]+dy[j]*dx[j_]*my[j]
-				x*dx[j_]*dx[j]+y*dy[j_]*dx[j]=dx[j_]*dx[j]*mx[j_]+dy[j_]*dx[j]*my[j_]
-				
-				x*dx[j]*dy[j_]+y*dy[j_]*dy[j]=dx[j]*dy[j_]*mx[j]+dy[j]*dy[j_]*my[j]
-				x*dx[j_]*dy[j]+y*dy[j_]*dy[j]=dx[j_]*dy[j]*mx[j_]+dy[j_]*dy[j]*my[j_]*/
-				
-				while ((a>0)&&( (vx[a-1]-mx[j])*dx[j] + (vy[a-1]-my[j])*dy[j] < 0 )) {
-					a--;
-					valid[vlink[a]]=0;
-					//DBG("@");
-				}
-				
-				j_=j-1;
-				if (j_<0) {j_+=m-1;}
+				j_=j+1;
+				if (j_>=m-1) {j_-=m-1;}
 				while (valid[j_]==0) {
-					j_--;
-					if (j_<0) {j_+=m-1;}
+					j_++;
+					if (j_>=m-1) {j_-=m-1;}
 				}
 				
-				vx[a]=( dy[j]*dy[j_]*(my[j]-my[j_]) + dx[j]*dy[j_]*mx[j] - dx[j_]*dy[j]*mx[j_] ) / (dx[j]*dy[j_]-dx[j_]*dy[j]);
-				vy[a]=( dx[j]*dx[j_]*(mx[j]-mx[j_]) + dy[j]*dx[j_]*my[j] - dy[j_]*dx[j]*my[j_] ) / (dy[j]*dx[j_]-dy[j_]*dx[j]);
-				vlink[a]=j;
+				//connect j and j_ at a point
 				
-				//DBG("cross[ %.2f %.2f with %.2f %.2f ] obtain [%.2f %.2f]\n",mx[j],my[j] ,mx[j_],my[j_] ,vx[a],vy[a]);
+				/*
+				(x-mx[j])dx[j]+(y-my[j])dy[j]=0
+				(x-mx[j_])dx[j_]+(y-my[j_])dy[j_]=0
 				
+				x*dx[j]+y*dy[j]=mx[j]*dx[j]+dy[j]*my[j]
+				x*dx[j_]+y*dy[j_]=mx[j_]*dx[j_]+dy[j_]*my[j_]
+				
+				
+				x*dx[j_]*dx[j]+y*dy[j]*dx[j_]=mx[j]*dx[j]*dx[j_]+dy[j]*my[j]*dx[j_]
+				x*dx[j_]*dx[j]+y*dy[j_]*dx[j]=mx[j_]*dx[j_]*dx[j]+dy[j_]*my[j_]*dx[j]
+				
+				x*dx[j]*dy[j_]+y*dy[j_]*dy[j]=mx[j]*dx[j]*dy[j_]+dy[j]*my[j]*dy[j_]
+				x*dx[j_]*dy[j]+y*dy[j_]*dy[j]=mx[j_]*dx[j_]*dy[j]+dy[j_]*my[j_]*dy[j]
+				
+				
+				y*(dy[j]*dx[j_]-dy[j_]*dx[j])=(mx[j]*dx[j]+dy[j]*my[j])*dx[j_]-(mx[j_]*dx[j_]+dy[j_]*my[j_])*dx[j]
+				x*(dx[j]*dy[j_]-dx[j_]*dy[j])=(mx[j]*dx[j]+dy[j]*my[j])*dy[j_]-(mx[j_]*dx[j_]+dy[j_]*my[j_])*dy[j]
+				*/
+				
+				vx[a]=(double)((mx[j]*dx[j]+dy[j]*my[j])*dy[j_] - (mx[j_]*dx[j_]+dy[j_]*my[j_])*dy[j]) / (double)(dx[j]*dy[j_] - dx[j_]*dy[j]);
+				vy[a]=(double)((mx[j]*dx[j]+dy[j]*my[j])*dx[j_] - (mx[j_]*dx[j_]+dy[j_]*my[j_])*dx[j]) / (double)(dy[j]*dx[j_] - dy[j_]*dx[j]);
+				vlink[a]=j_;
 				a++;
+				j=j_;
+				
+			}
+			
+			isit=false;
+			for (j=0;j<a;j++) {
+				j_=j-1;
+				if (j_<0) {j_+=a;}
+				while ( (vx[j_]-mx[vlink[j]])*dx[vlink[j]] + (vy[j_]-my[vlink[j]])*dy[vlink[j]] < -similar_rad ) {
+					if (valid[vlink[j_]]==1) {isit=true;}
+					valid[vlink[j_]]=0;
+					j_--;
+					if (j_<0) {j_+=a;}
+				}
 			}
 		}
 		
 		
-		vmax=0;//firstly identify all who can be left
-		a=0;
-		b=0;
-		j_=0;
-		for (int j=0;j<m-1;j++) {
-			
-			if (valid[j]==1) {
-				/*x*dx[j]+y*dy[j]=dx[j]*mx[j]+dy[j]*my[j]
-				x*dx[j_]+y*dy[j_]=dx[j_]*mx[j_]+dy[j_]*my[j_]
-				
-				x*dx[j]*dx[j_]+y*dy[j]*dx[j_]=dx[j]*dx[j_]*mx[j]+dy[j]*dx[j_]*my[j]
-				x*dx[j_]*dx[j]+y*dy[j_]*dx[j]=dx[j_]*dx[j]*mx[j_]+dy[j_]*dx[j]*my[j_]
-				
-				x*dx[j]*dy[j_]+y*dy[j_]*dy[j]=dx[j]*dy[j_]*mx[j]+dy[j]*dy[j_]*my[j]
-				x*dx[j_]*dy[j]+y*dy[j_]*dy[j]=dx[j_]*dy[j]*mx[j_]+dy[j_]*dy[j]*my[j_]*/
-				
-				while ((a>0)&&( (vx[a-1]-mx[j])*dx[j] + (vy[a-1]-my[j])*dy[j] < 0 )) {
-					a--;
-					valid[vlink[a]]=0;
-					//DBG("@");
-				}
-				
-				j_=j-1;
-				if (j_<0) {j_+=m-1;}
-				while (valid[j_]==0) {
-					j_--;
-					if (j_<0) {j_+=m-1;}
-				}
-				
-				vx[a]=( dy[j]*dy[j_]*(my[j]-my[j_]) + dx[j]*dy[j_]*mx[j] - dx[j_]*dy[j]*mx[j_] ) / (dx[j]*dy[j_]-dx[j_]*dy[j]);
-				vy[a]=( dx[j]*dx[j_]*(mx[j]-mx[j_]) + dy[j]*dx[j_]*my[j] - dy[j_]*dx[j]*my[j_] ) / (dy[j]*dx[j_]-dy[j_]*dx[j]);
-				vlink[a]=j;
-				
-				//DBG("cross[ %.2f %.2f with %.2f %.2f ] obtain [%.2f %.2f]\n",mx[j],my[j] ,mx[j_],my[j_] ,vx[a],vy[a]);
-				
-				a++;
-			}
-		}
-		
-		int j=vlink[0];//do not forget to finish a cycle
-		while ((a>0)&&( (vx[a-1]-mx[j])*dx[j] + (vy[a-1]-my[j])*dy[j] < 0 )) {
-			a--;
-			valid[vlink[a]]=0;
-			//DBG("@");
-		}
-		
-		
-		vmax=0;//now we are ready to build without all the intruders
-		a=0;
-		b=0;
-		j_=0;
-		for (int j=0;j<m-1;j++) {
-			
-			if (valid[j]==1) {
-				/*x*dx[j]+y*dy[j]=dx[j]*mx[j]+dy[j]*my[j]
-				x*dx[j_]+y*dy[j_]=dx[j_]*mx[j_]+dy[j_]*my[j_]
-				
-				x*dx[j]*dx[j_]+y*dy[j]*dx[j_]=dx[j]*dx[j_]*mx[j]+dy[j]*dx[j_]*my[j]
-				x*dx[j_]*dx[j]+y*dy[j_]*dx[j]=dx[j_]*dx[j]*mx[j_]+dy[j_]*dx[j]*my[j_]
-				
-				x*dx[j]*dy[j_]+y*dy[j_]*dy[j]=dx[j]*dy[j_]*mx[j]+dy[j]*dy[j_]*my[j]
-				x*dx[j_]*dy[j]+y*dy[j_]*dy[j]=dx[j_]*dy[j]*mx[j_]+dy[j_]*dy[j]*my[j_]*/
-				
-				while ((a>0)&&( (vx[a-1]-mx[j])*dx[j] + (vy[a-1]-my[j])*dy[j] < 0 )) {
-					a--;
-					valid[vlink[a]]=0;
-					//DBG("@");
-				}
-				
-				j_=j-1;
-				if (j_<0) {j_+=m-1;}
-				while (valid[j_]==0) {
-					j_--;
-					if (j_<0) {j_+=m-1;}
-				}
-				
-				vx[a]=( dy[j]*dy[j_]*(my[j]-my[j_]) + dx[j]*dy[j_]*mx[j] - dx[j_]*dy[j]*mx[j_] ) / (dx[j]*dy[j_]-dx[j_]*dy[j]);
-				vy[a]=( dx[j]*dx[j_]*(mx[j]-mx[j_]) + dy[j]*dx[j_]*my[j] - dy[j_]*dx[j]*my[j_] ) / (dy[j]*dx[j_]-dy[j_]*dx[j]);
-				vlink[a]=j;
-				
-				//DBG("cross[ %.2f %.2f with %.2f %.2f ] obtain [%.2f %.2f]\n",mx[j],my[j] ,mx[j_],my[j_] ,vx[a],vy[a]);
-				
-				a++;
-			}
-		}
-		
-	 
 		//now updage Steiner graph
 		
 		for (int j=0;j<a;j++) {
@@ -522,8 +462,6 @@ void Steiner_generate() {
 				B=imin;
 			}
 			
-			//DBG("edge:%.2f %.2f - %.2f %.2f | %d - %d\n",Steiner_x[A],Steiner_y[A],Steiner_x[B],Steiner_y[B],A,B);
-			
 			//now add an edge between them
 			
 			//to A
@@ -559,10 +497,6 @@ void Steiner_generate() {
 		
 		//now updage the screen
 		
-		/*for (int j=0;j<a;j++) {
-			DBG("[%f %f]\n",vx[j],vy[j]);
-		}DBG("{%f %f}\n\n",Base_x[i],Base_y[i]);/**/
-		
 		for (int x=-49;x<50;x++) {
 			for (int y=-49;y<50;y++) {
 				bool dodo=true;
@@ -585,7 +519,6 @@ void Steiner_generate() {
 			}
 		}
 		
-		//DBG("\n\n");
 	}
 	
 	//now mark all who has access to the outer space, they can not be mover while doing variations
