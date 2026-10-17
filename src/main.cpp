@@ -2952,8 +2952,12 @@ void prepare_objective() {
 }
 
 int main(int argc, char** argv) {
-
-
+	
+	bool do_always_try=true;//always try to make the solution feasible
+	//WARNING: it takes time equivalent to R block at each iteration, thus G,R->G,R,R
+	//use it if the search time on R block is small enough, then it is better to spend milisecond than lose the solution
+	//otherwise it will make E=sqrt(T) attempts, where T is the number of attempts (10-20)
+	
 	coeffs[0]=0.1;coeffs_min[0]=0.0001;coeffs_max[0]=0.5;
 	coeffs[1]=0.95;coeffs_min[1]=0.5;coeffs_max[1]=0.99;
 	coeffs[2]=1.0;coeffs_min[2]=0.01;coeffs_max[2]=10.0;
@@ -3145,7 +3149,7 @@ int main(int argc, char** argv) {
 			routes_save(2);
 		}
 		
-		if ((rand()%(int)(sqrt(tick)+1)==0)||(tick==1)) {
+		if ((rand()%(int)(sqrt(tick)+1)==0)||(tick==1)||(do_always_try==true)) {
 			DBG("trying to prepare it:");
 			routes_variate(10,10,-1, coeffs[0],2, coeffs[4]);
 			DBG("\n");
