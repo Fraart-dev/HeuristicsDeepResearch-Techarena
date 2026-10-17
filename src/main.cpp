@@ -2923,6 +2923,13 @@ void save_solution_to_json(const char* filename, int real_m) {
     out << "\n]\n";
 }
 
+void prepare_objective() {
+	initial_summ=0;
+	for (int i=0;i<n;i++) {
+		initial_summ+=Ob_weight[i];
+	}
+}
+
 int main(int argc, char** argv) {
 
 
@@ -2971,7 +2978,8 @@ int main(int argc, char** argv) {
 	
 	int ttt=time(0);
 #ifdef INTERACTIVE_MODE
-	ttt=1790337119;
+	//ttt=1790337119;
+	//to check bad testcases
 #endif
 	srand(ttt);
 	
@@ -3019,6 +3027,8 @@ int main(int argc, char** argv) {
 	DBG("#");
 	determine_class_forall();
 	DBG("#");
+	
+	prepare_objective();
 	
 	for (int i=0;i<n;i++) {Wanna[i]=Current[i];}
 	
