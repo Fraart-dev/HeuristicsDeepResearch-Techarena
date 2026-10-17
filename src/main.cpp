@@ -2938,9 +2938,17 @@ void save_solution_to_json(const char* filename, int real_m) {
 
 void prepare_objective() {
 	initial_summ=0;
+	int xmax=0,xmin=0,ymax=0,ymin=0;
 	for (int i=0;i<n;i++) {
 		initial_summ+=Ob_weight[i];
+		
+		if (Ob_x[i]>xmax) {xmax=Ob_x[i];}
+		if (Ob_x[i]<xmin) {xmin=Ob_x[i];}
+		if (Ob_y[i]>ymax) {ymax=Ob_y[i];}
+		if (Ob_y[i]<ymin) {ymin=Ob_y[i];}
 	}
+	global_rad_x=(xmax-xmin)/sqrt(n);
+	global_rad_y=(ymax-ymin)/sqrt(n);
 }
 
 int main(int argc, char** argv) {
@@ -3090,11 +3098,11 @@ int main(int argc, char** argv) {
 		uf2=0;
 		uf3=evaluate_unfeasibility_Skills();
 		
-		DBG("price:%f penalty_border:%f unfeasibility:%d %d %d %d   |before restart:%d\n",
-			len,penalty,uf,uf1,uf2,uf3,descend);
+		DBG("price:%f penalty_border:%f unfeasibility:%d %d %d   |before restart:%d\n",
+			len,penalty,uf,uf1,uf3,descend);
 		
-		if ((uf>=0) && ((uf<uf_)||(uf1<uf1_)||(uf2<uf2_)||(uf3<uf3_))) {
-			if ((uf<uf_)&&(uf1<uf1_)&&(uf2<uf2_)&&(uf3<uf3_)) {descend+=5;}
+		if ((uf>=0) && ((uf<uf_)||(uf1<uf1_)||(uf3<uf3_))) {
+			if ((uf<uf_)&&(uf1<uf1_)&&(uf3<uf3_)) {descend+=5;}
 			coeffs_feedback(0.1);
 		} else {
 			coeffs_feedback(-0.1);
@@ -3104,7 +3112,7 @@ int main(int argc, char** argv) {
 		
 		uf_=uf; uf1_=uf1; uf2_=uf2; uf3_=uf3;
 		
-		if (((uf<0)||((uf<=0)&&(uf1<=0)&&(uf2<=0)&&(uf3<=0))) || (descend<=0)) {
+		if (((uf<0)||((uf<=0)&&(uf1<=0)&&(uf3<=0))) || (descend<=0)) {
 			if (descend<=0) {
 				descend=15;
 				Steiner_load(2);
@@ -3118,7 +3126,7 @@ int main(int argc, char** argv) {
 		
 		if (global_best_found<0) {
 			if (((uf_best<0)||(uf<uf_best)) && ((uf1_best<0)||(uf1<uf1_best)) &&
-				((uf2_best<0)||(uf2<uf2_best)) && ((uf3_best<0)||(uf3<uf3_best))) {
+				((uf3_best<0)||(uf3<uf3_best))) {
 				uf_best=uf; uf1_best=uf1; uf2_best=uf2; uf3_best=uf3;
 				DBG("Have not found feasible still, that is why saving unfeasible\n");
 				Steiner_save(2);
@@ -3126,7 +3134,7 @@ int main(int argc, char** argv) {
 			}
 		}
 		
-		if ((len>=0)&&(uf==0)&&(uf1==0)&&(uf2==0)&&(uf3==0) &&
+		if ((len>=0)&&(uf==0)&&(uf1==0)&&(uf3==0) &&
 			((global_best_found<0) || (len<global_best_found))) {
 			DBG("------>New solution with %f price has been found!!! | without upgradeing at all<-------\n",len);
 			descend=10;
