@@ -1,0 +1,60 @@
+# Project: Project1
+# Makefile created by Dev-C++ 5.11
+# Modified: -O3 + debug/cli цели через -D-флаги; исходник в src/
+#
+# mingw32-make           — собрать версию для сдачи (peoj.exe)
+# mingw32-make debug     — собрать отладочную (peoj_dbg.exe, с scanf/printf)
+# mingw32-make cli       — собрать file-mode (peoj_cli.exe, путь из argv)
+# mingw32-make clean     — удалить всё
+
+# Примеры запуска:
+#   peoj_cli.exe tests\case1.json           -> tests\case1_solution.json
+#   peoj_cli.exe tests\case1.json out.json  -> out.json
+
+
+CPP       = g++.exe
+CC        = gcc.exe
+WINDRES   = windres.exe
+
+SRC       = src/main.cpp
+OBJ       = src/main.o
+OBJ_DBG   = src/main_dbg.o
+OBJ_CLI   = src/main_cli.o
+
+LINKOBJ   = src/main.o
+LIBS      = -L"C:/Program Files (x86)/Dev-Cpp/MinGW64/lib" -L"C:/Program Files (x86)/Dev-Cpp/MinGW64/x86_64-w64-mingw32/lib" -static-libgcc
+INCS      = -I"C:/Program Files (x86)/Dev-Cpp/MinGW64/include" -I"C:/Program Files (x86)/Dev-Cpp/MinGW64/x86_64-w64-mingw32/include" -I"C:/Program Files (x86)/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include"
+CXXINCS   = -I"C:/Program Files (x86)/Dev-Cpp/MinGW64/include" -I"C:/Program Files (x86)/Dev-Cpp/MinGW64/x86_64-w64-mingw32/include" -I"C:/Program Files (x86)/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include" -I"C:/Program Files (x86)/Dev-Cpp/MinGW64/lib/gcc/x86_64-w64-mingw32/4.9.2/include/c++"
+
+BIN       = peoj.exe
+BIN_DBG   = peoj_dbg.exe
+BIN_CLI   = peoj_cli.exe
+
+CXXFLAGS  = $(CXXINCS) -O3 -std=c++11
+CFLAGS    = $(INCS)
+RM        = rm.exe -f
+
+.PHONY: all all-before all-after clean clean-custom debug cli
+
+all: all-before $(BIN) all-after
+
+debug: $(OBJ_DBG)
+	$(CPP) $(OBJ_DBG) -o $(BIN_DBG) $(LIBS)
+
+cli: $(OBJ_CLI)
+	$(CPP) $(OBJ_CLI) -o $(BIN_CLI) $(LIBS)
+
+clean: clean-custom
+	${RM} $(OBJ) $(BIN) $(OBJ_DBG) $(BIN_DBG) $(OBJ_CLI) $(BIN_CLI)
+
+$(BIN): $(OBJ)
+	$(CPP) $(LINKOBJ) -o $(BIN) $(LIBS)
+
+src/main.o: $(SRC)
+	$(CPP) -c $(SRC) -o src/main.o $(CXXFLAGS)
+
+src/main_dbg.o: $(SRC)
+	$(CPP) -c $(SRC) -o src/main_dbg.o $(CXXFLAGS) -DINTERACTIVE_MODE
+
+src/main_cli.o: $(SRC)
+	$(CPP) -c $(SRC) -o src/main_cli.o $(CXXFLAGS) -DCLI_FILE_MODE

@@ -71,7 +71,9 @@ void err_exit(const char* const function_name) {
 const int N=10000;
 const int N_=1000;
 const int Tmax=7;
+
 int LN=2*(int)(log(N)/log(2)+5);
+
 const int M=50;
 const int M_=M*4;
 const int M__=500;
