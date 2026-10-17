@@ -19,8 +19,8 @@
 
 // Флаг локальной отладки. Вводится при компиляции
 
-#ifdef INTERACTIVE_MODE
-    #define DBG(...) DBG(__VA_ARGS__)
+#if defined(INTERACTIVE_MODE)  || defined(CLI_FILE_MODE)
+    #define DBG(...) printf(__VA_ARGS__)
 #else
     #define DBG(...) ((void)0)
 #endif
