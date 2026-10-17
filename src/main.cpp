@@ -2941,6 +2941,12 @@ void load_instance_from_json(const Json& root) {
     }
     
     m += 4;
+	const float BIG = 1e18f;
+	for (int i = 0; i < n; ++i) {
+		for (int k = 0; k < 4; ++k) {
+			Ob_Base_dist[i][m - 4 + k] = BIG;
+		}
+	}
 
     global_rad_x = (xmax - xmin) / sqrt(n);
     global_rad_y = (ymax - ymin) / sqrt(n);
@@ -3064,7 +3070,7 @@ int main(int argc, char** argv) {
 	Json root = Json::parse(text, pos);
 	load_instance_from_json(root);
 	
-	time_final=time(0)+290;
+	time_final=time(0)+29;
 	LN=2*(int)(log(n)/log(2)+5);
 	
 	real_m = m - 4;
